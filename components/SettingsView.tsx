@@ -5,11 +5,47 @@ interface SettingsViewProps {
   onStart: (settings: UserSettings) => void;
 }
 
+const translations = {
+  pt: {
+    subtitle: "Seu Tutor Pessoal de Inglês",
+    nameLabel: "COMO DEVO TE CHAMAR?",
+    namePlaceholder: "ex: Maria",
+    levelLabel: "NÍVEL DE PROFICIÊNCIA",
+    levels: {
+      [ProficiencyLevel.BEGINNER]: "Iniciante (A1-A2)",
+      [ProficiencyLevel.INTERMEDIATE]: "Intermediário (B1-B2)",
+      [ProficiencyLevel.ADVANCED]: "Avançado (C1-C2)",
+    },
+    topicLabel: "TÓPICO PARA CONVERSAR",
+    topicPlaceholder: "ex: Viagem, Entrevista de emprego",
+    startButton: "Começar Conversa",
+    footer: "Desenvolvido com Gemini 2.5 • Áudio em Tempo Real"
+  },
+  en: {
+    subtitle: "Personal English Tutor",
+    nameLabel: "WHAT SHOULD I CALL YOU?",
+    namePlaceholder: "e.g. Maria",
+    levelLabel: "PROFICIENCY LEVEL",
+    levels: {
+      [ProficiencyLevel.BEGINNER]: "Beginner (A1-A2)",
+      [ProficiencyLevel.INTERMEDIATE]: "Intermediate (B1-B2)",
+      [ProficiencyLevel.ADVANCED]: "Advanced (C1-C2)",
+    },
+    topicLabel: "TOPIC TO DISCUSS",
+    topicPlaceholder: "e.g. Travel, Job Interview",
+    startButton: "Start Conversation",
+    footer: "Powered by Gemini 2.5 • Real-time Audio"
+  }
+};
+
 const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
   const [name, setName] = useState('');
   const [level, setLevel] = useState<ProficiencyLevel>(ProficiencyLevel.BEGINNER);
-  const [topic, setTopic] = useState('Daily Routine');
+  const [topic, setTopic] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [lang, setLang] = useState<'pt' | 'en'>('pt');
+
+  const t = translations[lang];
 
   useEffect(() => {
     setMounted(true);
@@ -18,7 +54,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onStart({ name, level, topic });
+      // Default topic if empty
+      const finalTopic = topic.trim() || (lang === 'pt' ? 'Rotina Diária' : 'Daily Routine');
+      onStart({ name, level, topic: finalTopic });
     }
   };
 
@@ -31,6 +69,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
         {/* Main Card */}
         <div className="relative bg-slate-900/80 backdrop-blur-xl p-6 md:p-8 rounded-[1.75rem] border border-white/10 shadow-2xl">
           
+          {/* Language Toggle */}
+          <button 
+            onClick={() => setLang(prev => prev === 'pt' ? 'en' : 'pt')}
+            className="absolute top-6 right-6 text-xs font-bold text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-full px-3 py-1 transition-all"
+            type="button"
+          >
+            {lang === 'pt' ? '🇺🇸 EN' : '🇧🇷 PT'}
+          </button>
+
           {/* Header */}
           <div className="text-center mb-8 md:mb-10 space-y-2">
             <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-tr from-blue-500 to-purple-600 mb-2 md:mb-4 shadow-lg shadow-blue-500/30">
@@ -41,13 +88,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
             <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 tracking-tight">
               I.V.A.S
             </h1>
-            <p className="text-slate-400 text-xs md:text-sm font-medium uppercase tracking-widest">Personal English Tutor</p>
+            <p className="text-slate-400 text-xs md:text-sm font-medium uppercase tracking-widest">{t.subtitle}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
             {/* Name Input */}
             <div className="space-y-2">
-              <label className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">What should I call you?</label>
+              <label className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">{t.nameLabel}</label>
               <div className="relative group/input">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500 group-focus-within/input:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -57,38 +104,35 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
                 <input
                   type="text"
                   required
-                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl pl-11 pr-4 py-3 md:py-4 text-sm md:text-base text-white placeholder-slate-500 focus:bg-slate-800 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all duration-300"
-                  placeholder="e.g. Maria"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl pl-11 pr-4 py-3 md:py-4 text-sm md:text-base text-white placeholder-slate-500 focus:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  placeholder={t.namePlaceholder}
                 />
               </div>
             </div>
 
-            {/* Proficiency Level */}
-            <div className="space-y-2 md:space-y-3">
-              <label className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">Proficiency Level</label>
-              <div className="grid grid-cols-1 gap-2 md:gap-3">
+            {/* Level Selector */}
+            <div className="space-y-2">
+              <label className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">{t.levelLabel}</label>
+              <div className="grid grid-cols-1 gap-2">
                 {Object.values(ProficiencyLevel).map((lvl) => (
                   <button
                     key={lvl}
                     type="button"
                     onClick={() => setLevel(lvl)}
-                    className={`relative overflow-hidden group/btn text-left px-4 py-3 md:px-5 md:py-4 rounded-xl border transition-all duration-300 ${
+                    className={`relative px-4 py-3 md:py-4 rounded-xl text-left border transition-all duration-300 flex items-center group/btn ${
                       level === lvl
-                        ? 'bg-blue-600 border-blue-500 shadow-[0_0_25px_rgba(37,99,235,0.3)] transform scale-[1.02]'
-                        : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800 hover:border-slate-600'
+                        ? 'bg-blue-600/20 border-blue-500/50 text-white shadow-[0_0_20px_rgba(37,99,235,0.2)]'
+                        : 'bg-slate-800/30 border-slate-700/30 text-slate-400 hover:bg-slate-800/50 hover:border-slate-600'
                     }`}
                   >
-                    <div className="relative z-10 flex justify-between items-center">
-                      <span className={`font-semibold text-sm md:text-base ${level === lvl ? 'text-white' : 'group-hover/btn:text-slate-200'}`}>{lvl}</span>
-                      {level === lvl && (
-                        <span className="flex h-2 w-2 md:h-3 md:w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-200 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 md:h-3 md:w-3 bg-white"></span>
-                        </span>
-                      )}
+                    <div className={`w-4 h-4 rounded-full border mr-3 flex items-center justify-center transition-colors ${
+                       level === lvl ? 'border-blue-400 bg-blue-400' : 'border-slate-600 group-hover/btn:border-slate-500'
+                    }`}>
+                        {level === lvl && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </div>
+                    <span className="text-sm md:text-base font-medium">{t.levels[lvl]}</span>
                   </button>
                 ))}
               </div>
@@ -96,8 +140,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
 
             {/* Topic Input */}
             <div className="space-y-2">
-              <label className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">Topic to discuss</label>
-              <div className="relative group/input">
+              <label className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">{t.topicLabel}</label>
+               <div className="relative group/input">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500 group-focus-within/input:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -105,10 +149,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
                 </div>
                 <input
                   type="text"
-                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl pl-11 pr-4 py-3 md:py-4 text-sm md:text-base text-white placeholder-slate-500 focus:bg-slate-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 outline-none transition-all duration-300"
-                  placeholder="e.g. Travel, Job Interview"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl pl-11 pr-4 py-3 md:py-4 text-sm md:text-base text-white placeholder-slate-500 focus:bg-slate-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                  placeholder={t.topicPlaceholder}
                 />
               </div>
             </div>
@@ -116,24 +160,25 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onStart }) => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold py-3 md:py-4 rounded-xl shadow-xl hover:shadow-indigo-500/40 transition-all duration-300 transform hover:-translate-y-1 hover:scale-[1.01]"
+              className="w-full relative group overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900"
             >
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-              <span className="relative flex items-center justify-center gap-2 text-base md:text-lg">
-                Start Conversation
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </span>
+              <div className="relative rounded-[11px] bg-slate-900/50 group-hover:bg-transparent transition-colors duration-300 px-8 py-3.5 md:py-4">
+                 <div className="flex items-center justify-center gap-2">
+                     <span className="font-bold text-white text-base md:text-lg tracking-wide group-hover:scale-105 transition-transform">{t.startButton}</span>
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                     </svg>
+                 </div>
+              </div>
+              <div className="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-700 -skew-x-12 origin-left"></div>
             </button>
+
+            <div className="text-center pt-2">
+                <p className="text-[10px] text-slate-500 font-medium">{t.footer}</p>
+            </div>
           </form>
         </div>
       </div>
-      
-      {/* Footer hint */}
-      <p className="text-center text-slate-500 text-[10px] md:text-xs mt-6 md:mt-8">
-        Powered by Gemini 2.5 • Real-time Audio
-      </p>
     </div>
   );
 };

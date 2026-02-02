@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { ConnectionState, UserSettings, TranscriptionItem } from '../types';
 import { createPcmBlob, decodeAudioData, base64ToBytes, PCM_SAMPLE_RATE, downsampleBuffer, INPUT_SAMPLE_RATE } from '../utils/audio';
+import { supabase } from '../utils/supabaseClient';
 
 interface UseLiveSessionProps {
   settings: UserSettings;
@@ -23,14 +24,39 @@ export const useLiveSession = ({ settings }: UseLiveSessionProps) => {
   // Transcription Refs (to handle partial updates)
   const currentInputTransRef = useRef('');
   const currentOutputTransRef = useRef('');
+  
+  // Track active bubble IDs for streaming updates
+  const currentUserIdRef = useRef<string | null>(null);
+  const currentAiIdRef = useRef<string | null>(null);
 
   // Session Ref
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const currentSessionRef = useRef<any>(null); // To close it later
+  
+  // Supabase Session ID
+  const supabaseSessionIdRef = useRef<string | null>(null);
 
   const connect = useCallback(async () => {
     try {
       setStatus(ConnectionState.CONNECTING);
+      
+      // 1. Create Supabase Session
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('sessions')
+        .insert({
+          name: settings.name,
+          level: settings.level,
+          topic: settings.topic
+        })
+        .select()
+        .single();
+
+      if (sessionData) {
+        supabaseSessionIdRef.current = sessionData.id;
+        console.log("Supabase session created:", sessionData.id);
+      } else if (sessionError) {
+        console.error("Error creating Supabase session:", sessionError);
+      }
       
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
@@ -50,108 +76,47 @@ export const useLiveSession = ({ settings }: UseLiveSessionProps) => {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
-          systemInstruction: `Você é um PROFESSOR DE INGLÊS virtual para brasileiros, com personalidade amigável, clara e paciente.
-Seu papel é ensinar inglês de forma conversacional, como um professor humano em tempo real.
+          systemInstruction: `Você é o I.V.A.S, um tutor de inglês pessoal para brasileiros.
+Seu objetivo é ensinar conversação de forma natural, precisa e bilíngue.
 
-REGRAS PRINCIPAIS:
+DADOS DO ALUNO:
+Nome: ${settings.name}
+Nível: ${settings.level}
+Tópico: ${settings.topic}
 
-1. DETECÇÃO DE IDIOMA:
-- Se o usuário falar em PORTUGUÊS:
-  → Responda SOMENTE em português.
-- Se o usuário falar em INGLÊS:
-  → Responda em inglês
-  → Depois explique em português.
+PROTOCOLO DE RESPOSTA E TRADUÇÃO (Siga Rigorosamente):
 
-2. MODO PROFESSOR:
-Sempre:
-- Corrija erros gramaticais com educação.
-- Explique por que está errado.
-- Mostre a forma correta.
-- Dê exemplos simples.
+1. INTERAÇÃO BILÍNGUE (Obrigatório quando o aluno falar inglês):
+   - Primeiro: Responda naturalmente em INGLÊS.
+   - Segundo: IMEDIATAMENTE forneça a tradução ou explicação em PORTUGUÊS.
+   
+   Exemplo Correto:
+   "Excellent usage of the past tense!" 
+   "Excelente uso do passado!"
 
-Exemplo:
-Usuário: I did go yesterday  
-Resposta:
-Forma correta: I went yesterday  
-Em português:
-"I went" é o passado de "go".
+2. CORREÇÃO GRAMATICAL E DE PRONÚNCIA:
+   - Se o aluno cometer um erro, corrija-o gentilmente após responder.
+   - Explique o erro em PORTUGUÊS.
+   
+   Exemplo de Correção:
+   "You said 'I goed', but the correct form is 'I went'."
+   "Você disse 'I goed', mas a forma correta é 'I went' porque 'go' é um verbo irregular."
 
-3. ESTILO DE ENSINO:
-- Linguagem simples.
-- Frases curtas.
-- Didático.
-- Nunca seja rude.
-- Nunca diga que é uma IA.
-- Fale como um professor humano.
+3. SE O ALUNO FALAR EM PORTUGUÊS:
+   - Responda em Português, mas incentive o uso do inglês introduzindo termos relevantes.
 
-4. COMPORTAMENTO DO AVATAR:
-- Se o usuário acertar: elogie.
-- Se errar: corrija gentilmente.
-- Se ficar em silêncio: incentive.
-- Use frases como:
-  "Muito bem!"
-  "Vamos tentar de novo."
-  "Boa pergunta!"
+DIRETRIZES DE QUALIDADE:
+- A tradução deve ser CONTEXTUAL e NATURAL, não literal (Google Translate).
+- Fale de forma clara e pausada em inglês.
+- Certifique-se de que a transcrição do que você fala corresponda exatamente ao texto.
+- Não use emojis ou formatação complexa, foque na palavra falada.
+- Seja encorajador e paciente.
 
-5. EXPLICAÇÃO BILÍNGUE:
-Quando o usuário falar inglês, siga este padrão:
-
-Resposta:
-[Resposta em inglês]
-
-Explicação em português:
-[Explique o significado, estrutura e uso]
-
-Exemplo:
-User: How are you?
-Resposta:
-I am fine, thank you!
-
-Explicação em português:
-"How are you?" significa "Como você está?"
-"I am fine" significa "Eu estou bem".
-
-6. PRONÚNCIA (quando solicitado):
-Se o usuário pedir pronúncia:
-- Escreva a forma fonética simples para brasileiros.
-
-Exemplo:
-Coffee = có-fi
-
-7. MODO TREINO:
-Você pode propor exercícios como:
-- "Repita: I like coffee."
-- "Traduza: Eu gosto de estudar."
-
-Depois avalie a resposta.
-
-8. NÍVEL DO USUÁRIO:
-Assuma nível iniciante/intermediário.
-Fale devagar.
-Use frases simples.
-
-9. MEMÓRIA DIDÁTICA:
-Sempre que possível:
-- Reforce erros comuns.
-- Relembre palavras já ensinadas.
-- Não avance rápido demais.
-
-10. TOM:
-- Educado
-- Motivador
-- Profissional
-- Conversacional
-
-OBJETIVO:
-Ensinar inglês para brasileiros de forma clara, prática e conversacional, como um professor em tempo real.
-
-Nunca:
-- Responda fora do papel de professor.
-- Não use linguagem técnica de programação.
-- Não quebre as regras acima.`,
-          // Transcription disabled temporarily to resolve "Internal error encountered" if using unsupported models
-          // inputAudioTranscription: {}, 
-          // outputAudioTranscription: {} 
+TEMA DA CONVERSA: ${settings.topic}
+Comece se apresentando brevemente (Inglês e Português) e fazendo uma pergunta sobre o tópico.`,
+          // Enable transcription to show words in the UI
+          inputAudioTranscription: {}, 
+          outputAudioTranscription: {} 
         },
       };
 
@@ -275,44 +240,104 @@ Nunca:
        sourceNodesRef.current.clear();
        nextStartTimeRef.current = 0;
        setIsAiSpeaking(false);
+       
+       // Force end the current AI turn visual if interrupted
        currentOutputTransRef.current = ''; 
+       currentAiIdRef.current = null;
     }
 
-    // Handle Transcriptions
+    // Handle Real-time Transcriptions
+    // User Input
     if (serverContent?.inputTranscription) {
-        currentInputTransRef.current += serverContent.inputTranscription.text;
+        const text = serverContent.inputTranscription.text;
+        if (text) {
+            currentInputTransRef.current += text;
+            
+            // If we haven't started tracking this turn ID yet, do so
+            if (!currentUserIdRef.current) {
+                currentUserIdRef.current = Date.now().toString() + '-user';
+                currentAiIdRef.current = null; // Ensure AI turn is considered 'done' if user starts
+            }
+            
+            const turnId = currentUserIdRef.current;
+            const fullText = currentInputTransRef.current;
+
+            setTranscripts(prev => {
+                const exists = prev.find(item => item.id === turnId);
+                if (exists) {
+                    return prev.map(item => item.id === turnId ? { ...item, text: fullText } : item);
+                } else {
+                    return [...prev, { id: turnId, text: fullText, isUser: true, timestamp: Date.now() }];
+                }
+            });
+        }
     }
+
+    // AI Output
     if (serverContent?.outputTranscription) {
-        currentOutputTransRef.current += serverContent.outputTranscription.text;
+        const text = serverContent.outputTranscription.text;
+        if (text) {
+            currentOutputTransRef.current += text;
+
+            if (!currentAiIdRef.current) {
+                currentAiIdRef.current = Date.now().toString() + '-ai';
+                currentUserIdRef.current = null; // Ensure User turn is considered 'done' if AI starts
+            }
+            
+            const turnId = currentAiIdRef.current;
+            const fullText = currentOutputTransRef.current;
+
+            setTranscripts(prev => {
+                const exists = prev.find(item => item.id === turnId);
+                if (exists) {
+                    return prev.map(item => item.id === turnId ? { ...item, text: fullText } : item);
+                } else {
+                    return [...prev, { id: turnId, text: fullText, isUser: false, timestamp: Date.now() }];
+                }
+            });
+        }
     }
 
     if (serverContent?.turnComplete) {
-        // Commit transcripts to history
-        if (currentInputTransRef.current.trim()) {
-            setTranscripts(prev => [...prev, {
-                id: Date.now().toString() + '-user',
-                text: currentInputTransRef.current,
-                isUser: true,
-                timestamp: Date.now()
-            }]);
-            currentInputTransRef.current = '';
+        // --- SAVE TO SUPABASE ---
+        const sessionId = supabaseSessionIdRef.current;
+        if (sessionId) {
+            const promises = [];
+            
+            // Save User Message if exists
+            if (currentInputTransRef.current.trim()) {
+                promises.push(supabase.from('messages').insert({
+                    session_id: sessionId,
+                    text: currentInputTransRef.current.trim(),
+                    is_user: true
+                }));
+            }
+            
+            // Save AI Message if exists
+            if (currentOutputTransRef.current.trim()) {
+                promises.push(supabase.from('messages').insert({
+                    session_id: sessionId,
+                    text: currentOutputTransRef.current.trim(),
+                    is_user: false
+                }));
+            }
+            
+            if (promises.length > 0) {
+                Promise.all(promises).catch(err => console.error('Supabase save error:', err));
+            }
         }
-        
-        if (currentOutputTransRef.current.trim()) {
-            setTranscripts(prev => [...prev, {
-                id: Date.now().toString() + '-ai',
-                text: currentOutputTransRef.current,
-                isUser: false,
-                timestamp: Date.now()
-            }]);
-            currentOutputTransRef.current = '';
-        }
+
+        // Reset buffers and IDs for the next turn
+        currentInputTransRef.current = '';
+        currentOutputTransRef.current = '';
+        currentUserIdRef.current = null;
+        currentAiIdRef.current = null;
     }
   };
 
   const disconnect = useCallback(async () => {
     if (currentSessionRef.current) {
-        // Attempt to cleanup session logic if SDK provides methods, usually just closing socket implicitly
+        // Attempt to cleanup session logic if SDK provides methods
     }
 
     // Stop Microphones
@@ -340,6 +365,12 @@ Nunca:
     setStatus(ConnectionState.DISCONNECTED);
     setIsAiSpeaking(false);
     nextStartTimeRef.current = 0;
+    setTranscripts([]);
+    currentInputTransRef.current = '';
+    currentOutputTransRef.current = '';
+    currentUserIdRef.current = null;
+    currentAiIdRef.current = null;
+    supabaseSessionIdRef.current = null;
   }, []);
 
   // Cleanup on unmount
