@@ -45,22 +45,23 @@ export function downsampleBuffer(buffer: Float32Array, inputSampleRate: number, 
   if (inputSampleRate === outputSampleRate) {
     return buffer;
   }
+  if (outputSampleRate > inputSampleRate) {
+      return buffer; // Should not happen in this app context
+  }
   const sampleRateRatio = inputSampleRate / outputSampleRate;
-  const newLength = Math.round(buffer.length / sampleRateRatio);
+  const newLength = Math.floor(buffer.length / sampleRateRatio);
   const result = new Float32Array(newLength);
-  let offsetResult = 0;
-  let offsetBuffer = 0;
-  while (offsetResult < result.length) {
-    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
-    // Simple averaging (box filter) for downsampling
-    let accum = 0, count = 0;
-    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
-      accum += buffer[i];
+  
+  for (let i = 0; i < newLength; i++) {
+    const start = Math.floor(i * sampleRateRatio);
+    const end = Math.floor((i + 1) * sampleRateRatio);
+    let sum = 0;
+    let count = 0;
+    for (let j = start; j < end && j < buffer.length; j++) {
+      sum += buffer[j];
       count++;
     }
-    result[offsetResult] = count > 0 ? accum / count : 0;
-    offsetResult++;
-    offsetBuffer = nextOffsetBuffer;
+    result[i] = count > 0 ? sum / count : 0;
   }
   return result;
 }
@@ -69,9 +70,9 @@ export function createPcmBlob(data: Float32Array): Blob {
   const l = data.length;
   const int16 = new Int16Array(l);
   for (let i = 0; i < l; i++) {
-    // Clamp values to [-1, 1] range before scaling
+    // Advanced scaling with soft clipping
     const s = Math.max(-1, Math.min(1, data[i]));
-    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    int16[i] = s < 0 ? s * 32768 : s * 32767;
   }
   return {
     data: bytesToBase64(new Uint8Array(int16.buffer)),

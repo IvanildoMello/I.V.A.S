@@ -1,5 +1,5 @@
 {
-  "name": "I.V.A.S - AI English Tutor",
+  "name": "I.V.A.S - Tutor Personal AI English",
   "description": "A personalized, real-time English conversation tutor that corrects pronunciation and grammar.",
   "requestFramePermissions": [
     "microphone"
